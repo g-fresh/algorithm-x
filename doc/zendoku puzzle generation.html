@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en"><script type="text/javascript">window["_gaUserPrefs"] = { ioo : function() { return true; } }</script><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" type="text/css" href="zendoku%20puzzle%20generation-files/plain.css"><link rel="icon" type="image/png" href="http://garethrees.org/favicon.png"><link rel="alternate" type="application/rss+xml" title="RSS" href="http://garethrees.org/index_rss.xml">
+<link rel="prev" href="http://garethrees.org/2007/06/11/manchester-cathedral/">
+<link rel="next" href="http://garethrees.org/2007/09/28/housman/"><title>Zendoku puzzle generation</title></head><body class="article" itemscope="" itemtype="http://schema.org/Product"><nav><p><a class="prev-link" rel="prev" href="http://garethrees.org/2007/06/11/manchester-cathedral/">◀&nbsp;Murder in the cathedral</a> ✴ <a rel="up" href="http://garethrees.org/">garethrees.org</a> ✴ <a class="next-link" rel="next" href="http://garethrees.org/2007/09/28/housman/">Stars, I have seen them fall&nbsp;▶</a></p></nav><hr style="clear:both"><h1 itemprop="name">Zendoku puzzle generation</h1><p class="byline"><a rel="author" href="mailto:gdr@garethrees.org">Gareth Rees</a>,<time>2007-06-10</time></p><p class="abstract" itemprop="description" style="display:none">The
+ technical challenges involved in implementing a sudoku puzzle 
+generation algorithm on a handheld video game console, and how the 
+developers at Zoonami solved them in the production of <cite>Zendoku</cite> for the Nintendo DS and Sony PSP.</p>
+
+
+<img class="sidebar" src="zendoku%20puzzle%20generation-files/scan-1.png" alt="An easy Zendoku puzzle." width="238" height="238">
+
+<table><tbody><tr><td>
+<a href="#section-1">1. Introduction</a><br>
+<a href="#section-2">2. Requirements</a><br>
+<a href="#section-3">3. Strategic overview</a><br>
+<a href="#section-4">4. Generator</a><br>
+&nbsp; &nbsp; <a href="#section-4.1">4.1 Example: solving a 2×2 Latin square</a><br>
+&nbsp; &nbsp; <a href="#section-4.2">4.2 “Algorithm X”</a><br>
+&nbsp; &nbsp; <a href="#section-4.3">4.3 “Dancing Links”</a><br>
+&nbsp; &nbsp; <a href="#section-4.4">4.4 Application to sudoku</a><br>
+&nbsp; &nbsp; <a href="#section-4.5">4.5 Removing givens</a><br>
+<a href="#section-5">5. Grader</a><br>
+&nbsp; &nbsp; <a href="#section-5.1">5.1 Overview </a><br>
+&nbsp; &nbsp; <a href="#section-5.2">5.2 Tactics</a><br>
+&nbsp; &nbsp; <a href="#section-5.3">5.3 What if the difficulty isn’t right?</a><br>
+<a href="#section-6">6. Speed</a><br>
+<a href="#section-7">7. Other uses for the grader</a><br>
+<a href="#section-8">8. Competitors</a>
+</td></tr></tbody></table>
+
+
+<h2 id="section-1">1. Introduction</h2>
+
+<p>This article describes some of the technical challenges involved in 
+implementing a sudoku puzzle generation algorithm on a handheld video 
+game console, and how the developers at <a href="http://www.zoonami.com/">Zoonami Limited</a> solved them in the production of <a href="http://www.zendokugame.com/"><i>Zendoku</i></a>, released in Spring 2007 on the <a href="http://www.nintendo.com/systemsds">Nintendo DS</a> and <a href="https://en.wikipedia.org/wiki/PlayStation_Portable">Sony PSP</a>.</p>
+
+
+<h2 id="section-2">2. Requirements</h2>
+
+<p>Let’s start by considering the requirements the puzzle generator must satisfy.</p>
+
+<ol>
+<li>It must generate proper sudoku puzzles: there must be exactly one valid way to complete the grid.</li>
+<li>It must be able to generate puzzles with a wide range of 
+difficulties, so that we can please players of different skills, and so 
+that we can present a graded series of difficulties in <i>Zendoku</i>’s story mode.</li>
+<li>At each difficulty level, puzzles must not differ very much in 
+difficulty. A player’s progress must not depend mainly on how lucky they
+ get with the generator algorithm.</li>
+<li>It must produce a puzzle quickly on the Nintendo DS. It would be 
+rather unfortunate to have to resort to a “generating puzzle… please 
+wait” screen. Ideally, there should be no more than a second or so 
+between the player selecting a difficulty level and starting to play the
+ puzzle—no more time than it takes to animate the transition from the 
+menu to the game.</li>
+<li>The method must be cheap to develop, in terms of programmer time, as
+ we had only two programmers with whom to make a cross-platform console 
+game.</li>
+</ol>
+
+
+<h2 id="section-3">3. Strategic overview</h2>
+
+<p>The strategy we picked was <i>generate-and-test</i>.  This uses two algorithms: a <i>generator</i> which produces, in an unguided fashion, sudoku puzzles of unknown difficulty; and a <i>grader</i>,
+ which works out how difficult each puzzle is.  If a puzzle is the wrong
+ difficulty we throw it away and generate another candidate.</p>
+
+<p>This approach may seem rather odd at first sight, even wasteful. It’s
+ certainly quite unlike the way that human setters create sudoku 
+puzzles.  However, it has two advantages that were key for us: it’s 
+straightforward to develop, requiring little in the way of research, and
+ reliable in practice: given a generator that does a good job of 
+sampling the space of puzzles, and a grader that does a decent job of 
+determining the difficulty, getting the puzzle we’re after is a simple 
+matter of putting in enough CPU time.  Note that this may cause us some 
+difficulties for in creating puzzles fast enough—see <a href="#section-2">requirement 4</a>—but we can worry about that later—see <a href="#section-6">section 6</a>.</p>
+
+<p>Copying the methods of human setters seemed likely to be impractical 
+in the very limited time available, an exercise suited more for a 
+research project than a commercial game.  Also, it seemed likely that to
+ program these methods we would have to become reasonably proficient in 
+them ourselves, and that would also take time we didn’t have.</p>
+
+<p>A fallback possibility that we always had in mind was that we could 
+include with the game some pre-prepared puzzles.  If our 
+generate-and-test approach proved to be too slow to run on the console 
+itself, we could at least run it in our office and include the output in
+ the game.  Or, if we completely failed to produce a decent generator, 
+we could buy in puzzles from a composer.  This approach worked for 
+Hudson’s <a href="https://en.wikipedia.org/wiki/Sudoku_Gridmaster"><i>Sudoku Gridmaster</i></a> which contains “more than 400” built-in puzzles, created by Japanese puzzle company <a href="http://www.nikoli.co.jp/en/">Nikoli</a>.
+ However, this would be less suitable for a puzzle fighting game, which 
+ought to be able to support endless replay.  We could disguise the fact 
+that we were reusing puzzles from the built-in set by permuting the 
+symbols, rows and columns, but the experience would probably end up 
+being a bit “samey” after a while.  It also seemed like a bit of a 
+cop-out!</p>
+
+
+<h2 id="section-4">4. Generator</h2>
+
+<p>The basic idea behind our puzzle generator is as follows:</p>
+
+<ol>
+<li>Generate a random grid satisfying all the sudoku constraints.</li>
+<li>Pick a random permutation of the cells in the grid.</li>
+<li>For each cell in the permuted order: remove the symbol in that cell;
+ check to see if this has left the puzzle with multiple solutions; if 
+so, put the cell back.</li>
+</ol>
+
+<p>This generates an “irreducible puzzle”: a grid from which no more 
+cells can be removed without leaving multiple solutions. It’s a sudoku 
+puzzle, but at this stage we don’t know anything about how hard it is!</p>
+
+<p>For step (3) we need a fast solver (fast because it has to be run 
+many times for each puzzle we generate).  And having built a solver, 
+it’s easy to modify it to generate the completed grids in step (1), by 
+starting solving with an empty grid and making random choices when 
+available.</p>
+
+<p>The structure of the sudoku puzzle makes it an ideal candidate for representation as a <a href="https://en.wikipedia.org/wiki/Constraint_satisfaction_problem">constraint satisfaction problem</a>.
+  This approach has two neat aspects: it treats all the constraints 
+equally, so there’s no need to code up a distinction between choosing a 
+number to put in a cell and choosing a cell to put a number in; and 
+there’s a clever way of implementing the algorithm (Donald Knuth’s 
+“Dancing Links”; see <a href="#section-4.3">section 4.3</a>) which 
+allows choices that are ruled out by the constraints to be quickly 
+eliminated, and quickly put in again when backtracking.</p>
+
+
+<h3 id="section-4.1">4.1 Example: solving a 2×2 Latin square</h3>
+
+<p>I’ll illustrate the constraint satisfaction approach with a very 
+(very!) small problem: the solution of 2×2 Latin squares.  A Latin 
+square is like a sudoku except that there are no blocks, so in this case
+ we have to put the numbers 1 and 2 into the cells of a 2×2 grid so that
+ there is a 1 and a 2 in each row and each column (see <a href="#figure-1">figure 1</a>).</p>
+
+<table class="display ruled" style="width:100px">
+<caption id="figure-1"><b>Figure 1. Solve this 2×2 Latin square!</b></caption>
+<tbody><tr><td style="width:2em">&nbsp;</td><td style="width:2em">&nbsp;</td></tr>
+<tr><td style="width:2em">&nbsp;</td><td style="width:2em">&nbsp;</td></tr>
+</tbody></table>
+
+<p>You should find it straightforward to check by hand that there are exactly two solutions!</p>
+
+<p>We begin by building a matrix whose columns are the constraints and 
+whose rows are possible choices of placement.  In the case of 2×2 Latin 
+squares, there are 12 constraints (3 types of constraint, 2×2 = 4 
+constraints of each type).</p>
+
+<ul>
+<li>Constraints 1–4: We must place some number in each cell.</li>
+<li>Constraints 5–8: We must place each number somewhere in each row.</li>
+<li>Constraints 9–12: We must place each number somewhere in each column.</li>
+</ul>
+
+<p>There are 8 choices of placement: either number may be placed in each
+ cell.  Expressed as a binary matrix, the combinations of constraints 
+satisfied by each choice is shown in <a href="#figure-2">figure 2</a>.</p>
+
+<p class="display centred" id="figure-2"><b>Figure 2. Constraint matrix for a 2×2 Latin square.</b><br>
+<img src="zendoku%20puzzle%20generation-files/constraint-matrix.png" alt="Constraint matrix for a 2×2 Latin square." width="483" height="373"></p>
+
+<p>The size of this table should make it clear why I’ve chosen such a 
+small example: the smallest sudoku, 4×4, has 64 constraints and 64 ways 
+of placing a number, while a 9×9 sudoku has 324 constraints and 729 ways
+ of placing a number.  You can see the entire matrix for the latter <a href="http://www.stolaf.edu/people/hansonr/sudoku/exactcovermatrix.htm">illustrated in glorious ASCII</a> by Robert Hanson.</p>
+
+<p>So how does this constraint matrix help? Well, every solution to the 
+Latin square corresponds to a subset of rows from this matrix such that 
+each constraint is covered exactly once—that is, each column has a 
+single black square in the chosen subset of rows.  Computer scientists 
+will recognize this as an instance of the well-known NP-hard <a href="https://en.wikipedia.org/wiki/Exact_cover"><span style="font-variant: small-caps">EXACT COVER</span> problem</a>.</p>
+
+<p><a href="#figure-3">Figure 3</a> shows the rows corresponding to a solution to the 2×2 Latin square. Note that each column contains a single black square.</p>
+
+<table class="display ruled centred" style="width:100px;">
+<caption id="figure-3"><b>Figure 3. A 2×2 solution represented as a subset of rows from the constraint matrix.</b></caption>
+<tbody><tr><td style="width:2em">1</td><td style="width:2em">2</td></tr>
+<tr><td style="width:2em">2</td><td style="width:2em">1</td></tr>
+</tbody></table>
+
+<img class="display" src="zendoku%20puzzle%20generation-files/solution-set.png" alt="Solution set for a 2×2 Latin square." width="483" height="105">
+
+
+<h3 id="section-4.2">4.2 “Algorithm X”</h3>
+
+<p>We can find solution sets, if any exist, by a straightforward 
+application of depth-first search with backtracking.  In particular, we 
+can incrementally build up a set of rows making up a solution as 
+follows:</p>
+
+<ol>
+<li>Pick an unsatisfied constraint: that is, a column with no black cell
+ in any of the rows in the solution set.  If there are no unsatisfied 
+constraints remaining, the solution set is complete: if all we wanted 
+was any solution, we’re done; if we want all solutions, then make note 
+of the solution we’ve got and then backtrack to the previous time we 
+chose a row and take the next choice instead.</li>
+<li>Pick a row that satisfies that constraint: that is, one with a black
+ cell in the chosen column.  If there is no such row, then we’ve reached
+ a dead end and we must backtrack to the previous time we chose a row 
+and take the next choice instead.</li>
+<li>Add that row to the solution set.</li>
+<li>Delete all rows that satisfy any of the constraints satisfied by the
+ chosen row: that is, all rows that have a black cell in the same column
+ as a black cell in the chosen row.</li>
+<li>Return to step 1.</li>
+</ol>
+
+<p>Donald Knuth <a href="http://lanl.arxiv.org/pdf/cs/0011047">comments</a>
+ on this algorithm, “I will call [it] algorithm X for lack of a better 
+name […] Algorithm X is simply a statement of the obvious 
+trial-and-error approach. (Indeed, I can’t think of any other reasonable
+ way to do the job, in general.)”</p>
+
+<p>The choice of constraint at step 1 doesn’t affect the correctness of 
+the algorithm, but makes a great deal of difference to its running 
+speed. The obvious heuristic is to always pick the constraint satisfied 
+by the smallest number of rows, as this reduces the branching factor of 
+the search. Knuth calls this the “<i>S</i> heuristic”; see <a href="#section-4.4">section 4.4</a> for how well it performs in sudoku.</p>
+
+<p>The choice of row at step 2 doesn’t affect the correctness of the 
+algorithm either, so long as the backtracking makes sure to visit all 
+satisfying rows, but if there are multiple solutions the choice does 
+affect the order in which the solutions are generated.</p>
+
+<p><a href="#figure-4">Figure 4</a> shows this algorithm applied to our example.  The algorithm makes a bad decision at step 6 and has to backtrack.</p>
+
+<table class="display ruled centred">
+<caption id="figure-4"><b>Figure 4. Solving the 2×2 Latin square using Algorithm X.</b></caption>
+<tbody><tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-1.png" alt="1. Pick an unsatisfied constraint. 2. Pick a row satisfying that constraint." width="664" height="253"></td></tr>
+<tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-2.png" alt="3. Add the row to the solution set. 4. Delete all rows that satisfy any of the constraints satisfied by the chosen row." width="664" height="332"></td></tr>
+<tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-3.png" alt="5. Pick an unsatisfied constraint. 6. Pick a row satisfying that constraint." width="664" height="221"></td></tr>
+<tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-4.png" alt="7. Add the row to the solution set. 8. Delete all rows that satisfy any of the constraints satisfied by the chosen row." width="664" height="245"></td></tr>
+<tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-5.png" alt="9. Pick an unsatisfied constraint. 10. No rows! Backtrack to last choice." width="664" height="149"></td></tr>
+<tr><td>The last choice was at step 6, the selection of a row that 
+satisfies the fourth constraint, so we go back and pick the next row 
+satisfying the constraint.</td></tr>
+<tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-6.png" alt="11. Pick next row satisfying the constraint." width="664" height="190"></td></tr>
+<tr><td><img src="zendoku%20puzzle%20generation-files/algorithm-x-7.png" alt="12. Add the row to the solution set. 13. Delete all rows that satisfy any of the constraints satisfied by the chosen row." width="664" height="245"></td></tr>
+<tr><td>And so on. The remaining two rows will be added to the solution 
+set one at a time. It doesn’t matter which choices are made now, the 
+algorithm can make no more mistakes.</td></tr>
+</tbody></table>
+
+
+<h3 id="section-4.3">4.3 “Dancing Links”</h3>
+
+<p>Donald Knuth describes an efficient technique for implementing Algorithm X, which he calls “<a href="http://lanl.arxiv.org/pdf/cs/0011047">Dancing Links</a>”.  This starts with the observation that in typical instances of the <span style="font-variant: small-caps">EXACT COVER</span>
+ problem, the number of constraints satisfied by each row is quite 
+small.  This is particularly true in 9×9 sudoku, where the full 
+constraint matrix has 324 columns and 729 rows—236,196 cells in all—but 
+only 2,916 of those cells are occupied.</p>
+
+<p>We need to be able to search efficiently along columns (in steps 2 
+and 4) and along rows (in step 4), so we’ll make linked lists for each 
+row and column.  We need to be able to efficiently remove cells from 
+their column (in step 4) so we’ll use doubly-linked lists.  This means 
+that each occupied cell has four pointers, going to the occupied cells 
+to the left, right, above and below.  We also need to be able to pick 
+the best column to search (at step 1) so we’ll have additional data 
+structures representing columns, with a count of the number of occupied 
+cells in each.</p>
+
+<p><a href="#figure-5">Figure 5</a> shows the initial setup of the 
+matrix ready for searching.  The blue cells are the column headers, each
+ storing the number of cells in that column.  The extra cell at the top 
+left is the root of the whole data structure; it’s there so that we can 
+find the column headers of the constraints that we haven’t satisfied 
+yet.  The dashed lines indicate links that wrap around the diagram.</p>
+
+<p class="display centred" style="width:491px;" id="figure-5"><b>Figure 5. Dancing Links matrix for the 2×2 Latin square.</b>
+<img src="zendoku%20puzzle%20generation-files/dancing-links-1.png" alt="Initial setup of the Dancing Links matrix for the 2×2 Latin square." width="491" height="366"></p>
+
+<p>The basic operation is to remove a column from the matrix, together 
+with all the rows that intersect that column.  This operation can be 
+used to implement step 1 and step 4.  Knuth calls this “covering a 
+column”.  <a href="#figure-6">Figure 6</a> shows the matrix after 
+covering the leftmost column.  The green cells have been removed from 
+the matrix; the red arrows show the links that have been altered.</p>
+
+<p class="display centred" style="width:491px;" id="figure-6"><b>Figure 6. “Covering” a column.</b>
+<img src="zendoku%20puzzle%20generation-files/dancing-links-2.png" alt="“Covering” the leftmost column in the Dancing Links implementation of Algorithm X." width="491" height="366"></p>
+
+<p>The key observation that makes Dancing Links efficient is that as 
+long as you store a pointer to the column header, the “covering” 
+operation is easy to reverse.  That’s because the cells that have been 
+removed from matrix (coloured green in <a href="#figure-6">figure 6</a>)
+ still have pointers to their neighbours; they can be used to reverse 
+the operation; Knuth calls this “uncovering a column”.  In <a href="#figure-7">figure 7</a> these pointers are marked in red.</p>
+
+<p class="display centred" style="width:491px;" id="figure-7"><b>Figure 7. The pointers that can be used to “uncover” the column.</b>
+<img src="zendoku%20puzzle%20generation-files/dancing-links-3.png" alt="The pointers that can be used to “uncover” the leftmost column in the Dancing Links implementation of Algorithm X." width="491" height="366"></p>
+
+<p>We need to take some care when backtracking to uncover the columns in
+ precisely the reverse order to that in which we covered them.  For the 
+fiddly details, see Knuth’s “<a href="http://lanl.arxiv.org/pdf/cs/0011047">Dancing Links</a>” paper.</p>
+
+
+<h3 id="section-4.4">4.4 Application to sudoku</h3>
+
+<p class="sidebar centred" style="width:262px;" id="figure-8"><b>Figure 8. A tricky 9×9 sudoku.</b><br>
+<img src="zendoku%20puzzle%20generation-files/difficult-9x9.png" alt="
+...|...|.1.
+4..|...|...
+.2.|...|...
+---+---+---
+...|.5.|4.7
+..8|...|3..
+..1|.9.|...
+---+---+---
+3..|4..|2..
+.5.|1..|...
+...|8.6|..." width="262" height="262"></p>
+
+<p>The “Dancing Links” algorithm needs to run in two modes:</p>
+
+<ol>
+<li>To generate a random solved grid.  In this mode we stop the solver 
+as soon as it reaches a solution.  We want it to choose rows in a random
+ order at step 2 of the algorithm, so that a good subset of the space of
+ grids is reachable.  We populate the top row of the grid with a random 
+permutation of the nine symbols before running the solver.  This gives a
+ slight speedup—about 5%—over starting it on an empty grid.</li>
+<li>To check a candidate puzzle to see if it has multiple solutions.  In
+ this mode we stop the solver when it finds a second solution (if any), 
+or when it has examined the whole search tree and established that there
+ is only a single solution.  In this mode we don’t care what order it 
+chooses rows in at step 2, so we can save the effort of generating 
+random numbers.</li>
+</ol>
+
+<p>The “<i>S</i> heuristic” (choosing the column with the fewest rows) 
+is very effective indeed.  In a test of 100 randomly generated puzzles, 
+the algorithm using the <i>S</i> heuristic used 345,810 search nodes to 
+prove that each puzzle had a single solution.  The same solver without 
+the heuristic (always looking at the leftmost remaining column) needed 
+49,879,323 nodes to do the same.</p>
+
+<p>This rough-and-ready test suggests that the <i>S</i> heuristic thus 
+gives a speedup of about 144 times.  But the distribution is quite wide.
+  For easy puzzles, the speedup is often no more than 10 times.  But 
+some puzzles seem particularly tricky, for example when tackling the 
+sudoku puzzle in <a href="#figure-8">figure 8</a> (from Gordon Royle’s <a href="http://people.csse.uwa.edu.au/gordon/sudokumin.php">Minimum Sudoku</a> collection) the solver using the <i>S</i>
+ heuristic uses only 64 nodes to prove that there is a single solution 
+(no backtracking is necessary), while the solver without the heuristic 
+needs 21,677,544 nodes, for a speedup of 338,711 times.</p>
+
+<p>On the Nintendo DS, a rough rule of thumb was that it takes less than a frame (<sup>1</sup>/<sub>60</sub>&nbsp;s) for the solver to prove that a candidate puzzle has a single solution.</p>
+
+
+<h3 id="section-4.5">4.5 Removing givens</h3>
+
+<p>The “Dancing Links” solver generates a solved sudoku grid.  To make a
+ puzzle, we remove symbols until removing any more would allow multiple 
+solutions.</p>
+
+<p>The table in <a href="#figure-9">figure 9</a> shows the distribution 
+of given symbols remaining after removing as many symbols as possible  
+(based on 1,000 runs of the generator algorithm).</p>
+
+<p class="display centred" style="width:345px;" id="figure-9"><b>Figure 9. Distribution of given symbols.</b><br>
+<img src="zendoku%20puzzle%20generation-files/distribution-of-givens.png" alt="Table giving the proportion of generated puzzles by count of given symbols:
+20 0.1%
+21 0.5%
+22 4%
+23 19%
+24 32%
+25 29%
+26 13%
+27 2%
+28 0.1%
+" width="345" height="220"></p>
+
+
+<h2 id="section-5">5. Grader</h2>
+
+<p class="sidebar centred" style="width:264px;" id="figure-10"><b>Figure 10. A puzzle and its graded solution.</b><br>
+<img src="zendoku%20puzzle%20generation-files/graded-puzzle.png" alt="Puzzle:
+3..|.4.|91.
+.9.|...|6..
+2.7|...|...
+---+---+---
+.46|1..|...
+...|4..|..1
+8..|...|.3.
+---+---+---
+1..|...|5..
+...|568|..2
+..8|.7.|..4
+
+Solution:
+385|642|917
+491|857|623
+267|319|845
+---+---+---
+746|183|259
+523|496|781
+819|725|436
+---+---+---
+172|934|568
+934|568|172
+658|271|394
+
+Grading:
+  . 14e 06n | 21e   . 20e |   .   . 22e
+07n   . 09n | 39h 46e 38e |   . 02e 47e
+  . 15e   . | 55e 11e 56e | 13n 05e 48e
+------------+-------------+------------
+34e   .   . |   . 51e 52e | 29e 40h 36e
+35e 26e 32e |   . 50e 49e | 30e 43e   .
+  . 10e 33e | 37n 31e 41e | 04e   . 42e
+------------+-------------+------------
+  . 24e 25e | 54e 53e 03e |   . 44e 45e
+28e 27e 08e |   .   .   . | 01e 23n   .
+16e 17e   . | 19e   . 00e | 12n 18n   .
+" width="264" height="262"></p>
+
+<h3 id="section-5.1">5.1 Overview </h3>
+
+<p>The design of the grader is quite straightforward.  We have a 
+repertoire of deduction tactics that we believe human solvers might use,
+ ranked in order of their difficulty.  At each stage the grader applies 
+each of the tactics in turn, starting with the easiest, until one 
+results in a symbol being written in.  The difficulty of the hardest 
+tactic used during the stage is recorded.</p>
+
+<p>This process gives an order of solution of the puzzle, together with 
+the difficulty of deducing each symbol.  The difficulty of the whole 
+puzzle is simply the difficulty of the hardest symbol.  (We looked at 
+more sophisticated measures of overall difficulty, such as the average 
+of the difficulty of the deductions, but the evidence from playing the 
+game is that no number of easy deductions can be the equivalent of a 
+single hard deduction.)</p>
+
+<p><a href="#figure-10">Figure 10</a> shows a puzzle graded “hard”, with
+ the given symbols in black and the symbols to be deduced in pink.  The 
+small numbers in the bottom right of each cell give the order in which 
+the symbols were deduced by the grader; each “normal” move is annotated 
+with a plus sign (+); each “hard” move is annotated with a star (★); and
+ the remaining “easy” moves are plain.</p>
+
+<h3 id="section-5.2">5.2 Tactics</h3>
+
+<p>The tactics that the grader knows about are listed below.  The names 
+are by no means universally accepted, but are common on the web: see for
+ example Simon Armstrong’s collection of <a href="http://www.sadmansoftware.com/sudoku/techniques.htm">solving techniques</a>.</p>
+
+<ol>
+<li>Final symbol in set.  A row, column, or block has eight symbols in it, which means that we can deduce the last one.</li>
+<li><a href="http://www.sadmansoftware.com/sudoku/technique1.htm">Naked single</a>.  A symbol which can only go into one of the cells of a row, column, or block.</li>
+<li><a href="http://www.sadmansoftware.com/sudoku/technique2.htm">Hidden single</a>.  A cell in which only one symbol can go.</li>
+<li><a href="http://www.sadmansoftware.com/sudoku/technique5.htm">Naked pair</a>.  Two symbols which can only go into two of the cells of a row, column, or block.</li>
+<li><a href="http://www.sadmansoftware.com/sudoku/technique9.htm">Hidden pair</a>.  Two cells into which only two symbols can go.</li>
+<li><a href="http://www.sadmansoftware.com/sudoku/technique5.htm">Naked triple</a>.  Three symbols which can only go into three of the cells of a row, column, or block.</li>
+</ol>
+
+<p>A look through the literature on solving sudoku shows a number of other kinds of deductions with exotic names like “<a href="http://www.sadmansoftware.com/sudoku/technique6.htm">x-wing</a>” and “<a href="http://www.sadmansoftware.com/sudoku/technique13.htm">swordfish</a>”.
+  However, these are generally difficult deductions suited to 
+pencil-and-paper puzzles.  For the faster-paced pencil-less gameplay of <i>Zendoku</i>,
+ it would not be fun if players were required to make these kinds of 
+deductions.  Indeed, even with this small set of deductions, at the 
+“expert” level of difficulty it’s probably <a href="http://garethrees.org/2007/06/07/zendoku-tactics/#guessing">just as effective to guess the difficult moves</a> and accept the penalty for guessing wrong as it is to actually try to deduce the move.</p>
+
+<p>If you were composing pencil-and-paper puzzles using this 
+generate-and-test approach, you would want a much larger set of tactics.</p>
+
+
+<h3 id="section-5.3">5.3 What if the difficulty isn’t right?</h3>
+
+<p>The grader gives us an estimate of how difficult the puzzle is.  So 
+what if the puzzle is the wrong difficulty, for example if we want an 
+“easy” puzzle but the grader tells us we have a “normal” puzzle in hand?
+  If the puzzle is too easy, we just throw it away and ask the generator
+ for another.  But if the puzzle is too hard, there’s a neat way to make
+ it easier.  The grader gives us the difficulty of deducing each symbol,
+ so we can simply fill in all the symbols that are too hard for the 
+difficulty level we want.  (This might overshoot and make the puzzle 
+easier than we want, so except in the case where we want an easy puzzle,
+ we still have to check the result.  But that’s cheaper than generating a
+ new puzzle.)</p>
+
+<p><a href="#figure-11">Figure 11</a> shows the distribution of 
+difficulty of puzzles as they emerge from the generator (based on 1,000 
+runs of the generator algorithm).</p>
+
+<p class="display centred" id="figure-11"><b>Figure 11. Distribution of grades.</b><br>
+<img src="zendoku%20puzzle%20generation-files/distribution-of-grades.png" alt="Table giving the proportion of generated puzzles by grade, before filling in symbols that are too hard to deduce:
+easy 1%
+normal 14.4%
+hard 17.5%
+expert 19.4%
+master 47.7%
+" width="423" height="124"></p>
+
+<p><a href="#figure-12">Figure 12</a> shows how successful the 
+difficulty adjustment is, by giving the proportion of generated puzzles 
+that can be converted to each dificulty level by filling in symbols that
+ are too hard for that level (based on 1,000 runs of the generator 
+algorithm).</p>
+
+<p class="display centred" id="figure-12"><b>Figure 12. Proportion of generated puzzles suitable for each grade.</b><br>
+<img src="zendoku%20puzzle%20generation-files/distribution-of-success.png" alt="Table giving the proportion of generated puzzles that are suitable for conversion to each difficulty level by filling in symbols that are too hard to deduce at that level:
+easy 100%
+normal 33.3%
+hard 39.5%
+expert 30.7%
+master 45.4%
+" width="446" height="124"></p>
+
+<p>There’s a final wrinkle.  It turns out that it’s tricky to make fine 
+enough distinctions at the easy end of the difficulty spectrum.  When we
+ playtested the game, it became apparent that puzzles graded “easy” 
+spanned quite a wide range of difficulties, even though the deductions 
+were much the same from one puzzle to another.  (By that stage, we the 
+developers had solved so many sudokus in the course of development that 
+we no longer had any useful intuition about the difficulty of the 
+puzzles!)  It seems that the crucial factor is the “width” of the 
+puzzle: how many deductions are available at a given time.  When there 
+are lots of available deductions, it’s usually straightforward to find 
+one of them quickly.  When there are few, it takes longer to find them 
+and the puzzle seems difficult.</p>
+
+<p>We could have incorporated the number of available deductions into 
+the grading calculations.  But with little time remaining for testing, 
+we found a quick but inelegant hack that seemed to do a good job of 
+fixing the problem.  Since more deductions become available as you enter
+ more symbols, we specify for each difficulty level a minimum number of 
+given symbols and simply enter symbols to the puzzle until the minimum 
+number is reached.  This results in puzzles that wouldn’t pass muster in
+ some newspapers—because some of the given symbols are deducible from 
+some of the others—but do just fine in a video game.</p>
+
+
+<h2 id="section-6">6. Speed</h2>
+
+<p><a href="#figure-12">Figure 12</a> shows that we may need to run the 
+generation and grading algorithms several times before hitting on a 
+puzzle that’s of the right difficulty level.  On the Nintendo DS this 
+may take several seconds, so it looks as if we are in some danger of 
+failing <a href="#section-2">requirement 4</a>.</p>
+
+<p>To avoid the player having to wait, we arrange to keep a stock of 
+puzzles at each difficulty in the saved data. When the player starts 
+playing one of these puzzles, we start generating a new puzzle of that 
+difficulty to fill the vacant slot.  This generation can take place in a
+ low-priority background thread while the game is being played.</p>
+
+
+<h2 id="section-7">7. Other uses for the grader</h2>
+
+<p>The grader takes a sudoku puzzle and returns a suggested move order 
+together with the difficulty of each move.  This algorithm comes in 
+useful in two other places in the game.</p>
+
+<p>In <i>Zendoku</i>’s solo modes, the grader is run in the background 
+when the player makes a move.  The first few moves in the suggested move
+ order are displayed as hints.  Note that we can’t just look at the move
+ order for the original puzzle, as we have to take into account the 
+moves that the player has made so far.  If the player has made a wrong 
+move, we don’t want to give this away by offering incorrect hints or 
+failing to offer hints any more.</p>
+
+<p>In the story mode, the grader is run in the background to generate 
+the next move for the AI.  The AI makes the first move suggested by the 
+move order, taking time based on a function of the difficulty of the 
+move and the “skill” of the AI.  Again, we can’t just let the AI use the
+ original move order for the puzzle, because the player may have 
+“fumbled” (made a mistake), resulting in a gift of symbols to the AI.  
+The AI’s play needs to take into account these extra symbols, as they 
+will have made certain moves unnecessary, and other moves easier.</p>
+
+
+<h2 id="section-8">8. Competitors</h2>
+
+<p><i>Zendoku</i> was not the first sudoku game for a handheld console 
+to have puzzle generation capabilities; we were beaten to the punch by 
+UFO Interactive’s <a href="http://ufointeractivegames.com/details.asp?k=2419&amp;p=nds"><i>Sudoku Mania</i></a>, whose “auto-generating algorithm allows for an infinite number of puzzles”.</p>
+
+<p>Other competitors include:</p>
+
+<ul>
+
+<li>Nintendo’s <a href="https://en.wikipedia.org/wiki/Brain_Age:_Train_Your_Brain_in_Minutes_a_Day%21"><i>Brain Age</i></a>: “more than 100” puzzles.</li>
+
+<li>Hudson’s <a href="https://en.wikipedia.org/wiki/Sudoku_Gridmaster"><i>Sudoku Gridmaster</i></a>: “more than 400” puzzles.</li>
+
+<li>D3’s <a href="https://en.wikipedia.org/wiki/Essential_Sudoku_DS"><i>Essential Sudoku DS</i></a>: 1,000 puzzles.</li>
+
+<li>Ubisoft’s <a href="http://www.ubi.com/UK/Games/Info.aspx?pId=5582"><i>Platinum Sudoku</i></a>:
+ “20,000,000 different grids”.  It’s hard to know what to make of this 
+claim.  These levels surely can’t all be stored on the cartridge, it 
+would be absurdly expensive.  On the other hand if they were storing a 
+smaller set of grids and permuting them, the number is absurdly small 
+since the group of sudoku-preserving symmetries has size 2×3!<sup>8</sup>×9! which is more than 3×10<sup>8</sup>.
+  Perhaps this has a generation algorithm too and the number is 
+marketing-speak (like the “3 billion combinations” of the first Rubik’s 
+Cubes).</li>
+
+</ul>
+
+<p>Of course, <i>Zendoku</i> has many unique features not found in other sudoku games…</p>
+<hr style="clear:both"><script src="zendoku%20puzzle%20generation-files/intense-debate.js"></script>
+<span id="IDCommentsPostTitle" style="display:none"></span>
+<script src="zendoku%20puzzle%20generation-files/genericCommentWrapperV2.js"></script>
+</body></html>

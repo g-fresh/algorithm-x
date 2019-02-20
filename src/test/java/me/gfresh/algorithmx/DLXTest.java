@@ -2,7 +2,9 @@ package me.gfresh.algorithmx;
 
 import org.junit.Test;
 
+import java.util.AbstractMap;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -11,9 +13,14 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.stream.Stream;
 
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
 import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toSet;
 import static me.gfresh.algorithmx.Node.stream;
+import static org.junit.Assert.assertEquals;
 
 public class DLXTest {
 
@@ -21,9 +28,9 @@ public class DLXTest {
 //    public void testNodeLinks() throws Exception
 //    {
 //        Matrix matrix = new Matrix(3)
-//                .addRow(ImmutableSet.of(1, 3))
-//                .addRow(ImmutableSet.of(2))
-//                .addRow(ImmutableSet.of(2, 3));
+//                .addRow(asSet(1, 3))
+//                .addRow(asSet(2))
+//                .addRow(asSet(2, 3));
 //
 //        Function<Node, Integer> columnNumber = node -> node.getColumn();
 //
@@ -63,91 +70,6 @@ public class DLXTest {
 
     private <T> List<T> collect(Function<Node, T> mapper, Iterable<Node> iterable) {
         return stream(iterable).map(mapper).collect(toList());
-    }
-
-    @Test
-    public void buildMatrixFromConstraints()
-    {
-        Map<Mark, Set<Integer>> map = new HashMap<>();
-        int constraintNum = 0;
-        // some number in row/rol constraints
-        for (int row = 1; row <= 2; row++) {
-            for (int col = 1; col <= 2; col++) {
-                constraintNum++;
-                for (int num = 1; num <= 2; num++) {
-                    map.computeIfAbsent(new Mark(row, col, num), (m) -> new TreeSet<>()).add(constraintNum);
-                }
-            }
-        }
-        // number must appear in row
-        for (int num = 1; num <= 2; num++) {
-            for (int row = 1; row <= 2; row++) {
-                constraintNum++;
-                for (int col = 1; col <= 2; col++) {
-                    map.computeIfAbsent(new Mark(row, col, num), (m) -> new TreeSet<>()).add(constraintNum);
-                }
-            }
-        }
-        // number must appear in column
-        for (int col = 1; col <= 2; col++) {
-            for (int num = 1; num <= 2; num++) {
-                constraintNum++;
-                for (int row = 1; row <= 2; row++) {
-                    map.computeIfAbsent(new Mark(row, col, num), (m) -> new TreeSet<>()).add(constraintNum);
-                }
-            }
-        }
-
-        Matrix matrix = new Matrix(constraintNum);
-        Map<Integer, Mark> reverseMapping = new HashMap<>();
-        Iterator<Map.Entry<Mark, Set<Integer>>> itr = map.entrySet().iterator();
-        for (int row = 1; itr.hasNext(); row++) {
-            Map.Entry<Mark, Set<Integer>> entry = itr.next();
-            reverseMapping.put(row, entry.getKey());
-            matrix.addRow(entry.getValue());
-        }
-
-        matrix.print(System.out);
-
-        List<Mark> marksForSolution = new ArrayList<>();
-        Function<Set<Integer>, Boolean> onSolution = solution -> {
-            solution.forEach(n -> marksForSolution.add(reverseMapping.get(n)));
-            System.out.println("Solution: " + marksForSolution);
-            marksForSolution.clear();
-            return true;
-        };
-        new DLX(matrix, onSolution).search();
-
-    }
-
-    static class Mark {
-
-        final int row, col, number;
-
-        public Mark(int row, int col, int number) {
-            this.row = row;
-            this.col = col;
-            this.number = number;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj == this) return true;
-            if (! (obj instanceof Mark)) return false;
-            Mark other = (Mark) obj;
-            return row == other.row && col == other.col && number == other.number;
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(row, col, number);
-        }
-
-        @Override
-        public String toString() {
-            return String.format("(%d,%d)=%d", row, col, number);
-        }
-
     }
 
 }

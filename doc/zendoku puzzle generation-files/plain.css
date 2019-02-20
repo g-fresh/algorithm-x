@@ -1,0 +1,138 @@
+/* PLAIN.CSS -- FOR GARETHREES.ORG */
+/* Gareth Rees, 2009-02-12 */
+/* http://www.colourlovers.com/palette/373610/mellon_ball_surprise */
+
+
+/* 1. GENERAL STYLE */
+
+html {font-family:Optima, Verdana, sans-serif; font-size: 16px; background-color:white}
+code,kbd,pre,samp,tt,.script {font-family:"Lucida Sans Typewriter", monospace; font-size:14px}
+img {border:none}
+caption {margin-top:.5em; margin-bottom:.5em}
+table tr {vertical-align:top}
+figure img {margin-bottom:.5em}
+h1 {text-align:center}
+nav {text-align:center}
+a:visited {font-weight:bold; text-decoration:none; color:#f56991}
+a:link {font-weight:bold; text-decoration:none; color:#698cee}
+hr {border-width:0px; height:1px; color:#698cee; background-color:#698cee}
+sup,sub {font-size:60%}
+
+
+/* 2. SITE-SPECIFIC CLASSES */
+
+h1 + p.byline {margin-top:-1em}
+body.article a:hover {background-color:#ccc}
+table.ruled, table.ruled td, table.ruled th {border-collapse:collapse; border: 1px solid #ccc; padding:0.25em}
+table.striped tbody tr:nth-child(odd) {background-color:#eee}
+table.checkered tbody tr:nth-child(odd) td:nth-child(even), table.checkered tbody tr:nth-child(even) td:nth-child(odd) {background-color:#eeeeee}
+table.references td:first-child {white-space:nowrap}
+table.history td:first-child {white-space:nowrap}
+p, body.article li, body.article blockquote {text-align:justify}
+p {margin-bottom:0}
+.index-detail p {margin-bottom:1em}
+p + p {margin-top:0; margin-bottom:0; text-indent:2.5em}
+.abstract + p, .byline + p, .indent + p, .display + p, .centred + p, .jigsaw + p, .box + p, p:first-child, .abstract + .sidebar + p, .byline + .sidebar + p, p.indent, p.centred, p.display, p.byline, p.jigsaw, p.box, p + table, p.noindent {margin-top:1em; text-indent:0em}
+p.sidebar, p.jigsaw, p.box {text-indent:0em}
+
+iframe, img, .box {max-width:100%; height:auto}
+p.byline, nav p {text-align:center}
+.sidebar, .left-sidebar {display:block; font-size:small}
+.display {display:block; clear:both; margin:1em auto 1em auto; max-width:100%}
+div.display {overflow-x:scroll}
+table.display {display:table}
+span.caption {font-style:italic; display:block}
+.box {border-style:solid; border-width:thin; border-color:#698cee; padding:.5em .5em .5em .5em; background-color:#eee}
+.centred, body.article .centred {text-align:center}
+.jigsaw {display:inline-block; vertical-align:top; font-size:small; margin:.5em .5em .5em 0}
+.abstract {display:none}
+.codeblock {padding:15px; background-color:#eee; border-radius:8px; max-width:100%; overflow-x:scroll; text-indent:0px; margin-top:1em}
+.codeblock p {text-indent:0px; margin-top:1em}
+.script p {text-indent:0; text-align:left; margin-top:1em}
+.script .speaker {text-align:center; font-weight:bold}
+.script .speech {margin-left:3em; margin-right:3em}
+
+
+/* 3. EMACS FACES (FOR HTMLIZE OUTPUT) */
+
+pre .builtin, code .builtin {color:#da70d6}
+pre .comment, code .comment {color:#b22222}
+pre .comment, code .comment-delimiter {color:#b22222}
+pre .constant, code .constant {color:#0000ff}
+pre .doc, code .doc {color:#2f4f4f}
+pre .function, code .function-name {color:#0000ff}
+pre .keyword, code .keyword {color:#a020f0}
+pre .makefile, code .makefile-targets {color:#0000ff}
+pre .preprocessor, code .preprocessor {color:#da70d6}
+pre .regexp, code .regexp-grouping-backslash {font-weight:bold}
+pre .regexp, code .regexp-grouping-construct {font-weight:bold}
+pre .string, code .string {color:#2f4f4f}
+pre .type, code .type {color:#228b22}
+pre .variable, code .variable-name {color:#b8860b}
+pre .warning, code .warning {color:#ff0000; font-weight:bold}
+
+
+/* 4. INDEX */
+
+.index-brief {width:100%}
+.index-brief td:first-child {white-space:nowrap}
+.index-brief td {padding:0.25em}
+.index-brief th {text-align:left; padding:0.25em}
+.index-brief tr:nth-child(even) {background-color:#eee}
+.index-detail {width:100%; margin:1em auto 1em auto}
+.index-row, .index-article {background-color:#f8f8f8; margin:0; position:relative}
+.index-article.left {text-align:right}
+.index-article div {padding:1em}
+.index-article h3 {margin-top:0}
+.index-article p {margin-bottom:0}
+.index-article.left img {float:left; margin:0 1em 1em 0}
+.index-article.right img {float:right; margin:0 0 1em 1em}
+.index-article > a {position:absolute; width:100%; height:100%; top:0; left:0; z-index:10}
+.index-images {text-align:center}
+.feed {vertical-align:middle}
+
+
+/* 5. MATHJAX */
+
+div.MathJax_Display {text-indent:0; max-width:100%; overflow-x:scroll}
+
+
+/* 6. MEDIA */
+
+@media (min-width:750px) and (min-device-width:961px) {
+    body.article {max-width:750px; margin:auto}
+    .sidebar {clear:right; float:right}
+    p + .sidebar, p .sidebar {margin-top:1em}
+    .left-sidebar {clear:left; float:left}
+    .codeblock {max-height:800px; overflow-y:scroll}
+    .nowrap {white-space:nowrap}
+    li {margin-right:2.5em}
+    blockquote {margin-left:2.5em; margin-right:2.5em}
+    .indent {margin-left:2.5em}
+    .index-row {display:table-row; width:100%}
+    .index-article {width:50%; display:table-cell}
+    .index-row:nth-child(odd) .left, .index-row:nth-child(even) .right {background-color:#eee}
+}
+
+@media (min-width:950px) and (min-device-width:961px) {
+    .sidebar {margin:0 -100px 1em 1em}
+    .left-sidebar {margin:0 1em 1em -100px}
+    div.gallery {clear:both; margin-right:-100px}
+}
+
+@media (min-width:750px) and (max-width:949px) and (min-device-width:961px) {
+    .sidebar {margin:0 0 .5em 1em}
+    .left-sidebar {margin:1em 1em .5em 0}
+}
+
+@media (max-width:749px), (max-device-width:960px) {
+    .sidebar, .left-sidebar {display:block; margin:1em auto}
+    p + .sidebar, p .sidebar {margin-top:1em}
+    p, body.article li, body.article blockquote {text-align:left}
+    blockquote {margin-left:1.5em; margin-right:0px}
+    .indent {margin-left:1.5em}
+    .index-row .left {background-color:#eee}
+    .index-article {width:100%}
+}
+
+.index-row .index-article:hover {background-color:#ccc}

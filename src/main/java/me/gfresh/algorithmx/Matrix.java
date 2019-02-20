@@ -7,12 +7,17 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.SortedSet;
 import java.util.TreeSet;
+import java.util.stream.Stream;
 
 import static java.util.Comparator.comparing;
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
+import static java.util.stream.Collectors.toSet;
 import static me.gfresh.algorithmx.Node.stream;
 
 public final class Matrix {
@@ -26,7 +31,7 @@ public final class Matrix {
     }
 
     private static Head createColumnHeader(int numColumns) {
-        Head head = new Head(42);
+        Head head = new Head(0);
         Node prev = head;
         for (int col = 1; col <= numColumns; col++) {
             prev = prev.insertLeft(new Head(col));
@@ -60,15 +65,19 @@ public final class Matrix {
         }
     }
 
-    public boolean isEmpty() {
+    boolean isEmpty() {
         return root.right == root;
+    }
+
+    Head getHeader() {
+        return root;
     }
 
     //
     // TODO document this: Selects element which appears in the smallest number of sets.
     // (use consistent terminology: universe/sets vs. constraints)
     //
-    public Head selectNextColumn() {
+    Head selectNextColumn() {
         Optional<Node> min = stream(root.iterate(Direction.Right))
                 .min(comparing(node -> ((Head) node).getNodeCount()));
         return (Head) min.orElseThrow(() -> new IllegalStateException("Empty matrix"));
