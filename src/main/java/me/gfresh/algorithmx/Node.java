@@ -1,5 +1,7 @@
 package me.gfresh.algorithmx;
 
+import me.gfresh.algorithmx.NodeIterator.Direction;
+
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -44,15 +46,15 @@ class Node {
     void cover() {
         Head column = head;
         unlinkColumn(column);
-        for (Node c : column.iterate(NodeIterator.Direction.Down))
-            for (Node r : c.iterate(NodeIterator.Direction.Right))
+        for (Node c : column.iterate(Direction.Down))
+            for (Node r : c.iterate(Direction.Right))
                 unlinkRow(r);
     }
 
     void uncover() {
         Head column = head;
-        for (Node c : column.iterate(NodeIterator.Direction.Up))
-            for (Node r : c.iterate(NodeIterator.Direction.Left))
+        for (Node c : column.iterate(Direction.Up))
+            for (Node r : c.iterate(Direction.Left))
                 relinkRow(r);
         relinkColumn(column);
     }
@@ -79,7 +81,7 @@ class Node {
         node.head.nodeCount++;
     }
 
-    Iterable<Node> iterate(NodeIterator.Direction direction) {
+    Iterable<Node> iterate(Direction direction) {
         return () -> new NodeIterator(this, direction);
     }
 
